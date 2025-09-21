@@ -1,8 +1,4 @@
 import { AppSidebar } from "@/components/modern-layout/app-sidebar";
-import { BreadcrumbNavigation } from "@/components/modern-layout/breadcrumb-navigation";
-
-import { Frame, PieChart, Map } from "lucide-react";
-
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export default function layout({ children }: { children: React.ReactNode }) {
@@ -32,7 +28,9 @@ export default function layout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <AppSidebar items={items} user={user} />
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset className="overflow-auto">
+        <div className="flex-1 overflow-auto">{children}</div>
+      </SidebarInset>
     </SidebarProvider>
   );
 }

@@ -80,6 +80,12 @@ export default function RootLayout({
                   >
                     RAG App
                   </a>
+                  <a 
+                    href="/email-classification" 
+                    className="text-slate-600 hover:text-slate-900 font-medium transition-colors duration-200"
+                  >
+                    Email Classification
+                  </a>
                 </div>
 
                 {/* Authentication Buttons */}

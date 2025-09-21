@@ -182,14 +182,14 @@ table td:last-child {
 }
 table tbody tr td:last-child div  {
   justify-content: end;
-  
+
 }
 .department-table .office, .key-control table th:last-child{
   text-align: center !important;
 }
 table th:last-child,table td:last-child{
   /* text-align: left; */
-  
+
 }
 /* table thead tr th:last-child{
   justify-content: end;

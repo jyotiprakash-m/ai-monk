@@ -15,6 +15,11 @@ export default function layout({ children }: { children: React.ReactNode }) {
       url: "/email-classification/database",
       icon: "Map",
     },
+    {
+      name: "Core Functionality",
+      url: "/email-classification/core-functionality",
+      icon: "Code",
+    },
   ];
   const user: { name: string; email: string; avatar: string } = {
     name: "Jane Doe",

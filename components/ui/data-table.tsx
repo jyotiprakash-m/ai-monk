@@ -76,6 +76,7 @@ interface DataTableProps<TData, TValue> {
   onPageChange: (page: number) => void;
   title: string;
   loading?: boolean;
+  customFilters?: React.ReactNode;
 }
 
 export function DataTable<TData, TValue>({
@@ -87,6 +88,7 @@ export function DataTable<TData, TValue>({
   onPageChange,
   title,
   loading = false,
+  customFilters,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -173,7 +175,11 @@ export function DataTable<TData, TValue>({
         <div className="flex items-center gap-2 ">
           <h1 className="text-lg font-semibold">{title}</h1>
         </div>
-        <div className="flex items-center gap-2 ">
+        <div className="flex items-center gap-2 flex-wrap">
+          {customFilters}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap w-full justify-between border-t pt-2">
+          <div className="flex items-center gap-2">
           {filterableColumns.length > 0 && (
             <>
               <Select
@@ -203,6 +209,8 @@ export function DataTable<TData, TValue>({
               )}
             </>
           )}
+          </div>
+          <div className="flex items-center gap-2">
           <ColumnVisibilitySelect table={table} />
           <Button
             variant="outline"
@@ -212,6 +220,7 @@ export function DataTable<TData, TValue>({
           >
             Export CSV
           </Button>
+          </div>
         </div>
       </div>
 

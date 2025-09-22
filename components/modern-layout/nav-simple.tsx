@@ -1,7 +1,7 @@
 "use client";
 
 // We can only import icons we actually use to avoid bundling the entire icon set.
-import { Frame, PieChart, Map } from "lucide-react";
+import { Frame, PieChart, Map, Code } from "lucide-react";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -18,7 +18,7 @@ type Project = {
 
 export function NavSimple({ items }: { items: Project[] }) {
   // Mapping of icon names to actual icon components
-  const iconMap: Record<string, typeof Frame> = { Frame, PieChart, Map };
+  const iconMap: Record<string, typeof Frame> = { Frame, PieChart, Map, Code };
 
   return (
     <SidebarGroup>

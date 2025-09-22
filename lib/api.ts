@@ -21,9 +21,11 @@
 // - GET /deliveries - Get deliveries data
 // - GET /documents - Get documents data
 // - GET /audit_logs - Get audit logs data
+// - POST /store_document_vector - Upload document and store vectors (multipart/form-data)
 //
 // Response Format:
-// { data: [...] }
+// Database endpoints: { data: [...] }
+// Upload endpoint: { message: string, document_id?: string }
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1/db";
@@ -40,8 +42,37 @@ export interface ApiResponse<T> {
   limit?: number;
 }
 
-export interface TableData {
-  [key: string]: any;
+export interface Email {
+  email_id: string;
+  subject: string;
+  from: string;
+  date: string;
+  body: string;
+  classification_report: {
+    predicted_department: string;
+    confidence: number;
+    all_probabilities: {
+      [department: string]: number;
+    };
+  };
+  sentiment_analysis: string;
+}
+
+export interface EmailClassificationResult {
+  emails: Email[];
+  total_emails_in_inbox: number;
+}
+
+export interface ReplyResponse {
+  tone: string;
+  email_body: string;
+  email_subject: string;
+  tool_instructions: string;
+  collection_name: string;
+  custom_query_input: string;
+  input: string;
+  final_response: string;
+  tool_outputs: string;
 }
 
 class ApiClient {
@@ -85,17 +116,17 @@ class ApiClient {
     tableName: string,
     page: number = 1,
     limit: number = 50
-  ): Promise<ApiResponse<TableData[]>> {
+  ): Promise<ApiResponse<Record<string, any>[]>> {
     // Map frontend table names to API endpoints
     const endpointMap: { [key: string]: string } = {
-      Users: "/users",
-      Applications: "/applications",
-      Approvals: "/approvals",
-      Orders: "/orders",
-      OrderItems: "/order_items",
-      Deliveries: "/deliveries",
-      Documents: "/documents",
-      AuditLogs: "/audit_logs",
+      Users: "/db/users",
+      Applications: "/db/applications",
+      Approvals: "/db/approvals",
+      Orders: "/db/orders",
+      OrderItems: "/db/order_items",
+      Deliveries: "/db/deliveries",
+      Documents: "/db/documents",
+      AuditLogs: "/db/audit_logs",
     };
 
     const endpoint = endpointMap[tableName];
@@ -103,7 +134,7 @@ class ApiClient {
       throw new Error(`Unknown table: ${tableName}`);
     }
 
-    return this.request<ApiResponse<TableData[]>>(endpoint);
+    return this.request<ApiResponse<Record<string, any>[]>>(endpoint);
   }
 
   // Get total count for a table (using data length since count endpoint not provided)
@@ -130,7 +161,7 @@ class ApiClient {
     query: string,
     page: number = 1,
     limit: number = 50
-  ): Promise<ApiResponse<TableData[]>> {
+  ): Promise<ApiResponse<Record<string, any>[]>> {
     // For now, just return all data (search not implemented)
     console.warn(`Search not implemented, returning all ${tableName} data`);
     return this.getTableData(tableName, page, limit);
@@ -151,6 +182,243 @@ class ApiClient {
         "AuditLogs",
       ],
     };
+  }
+
+  // Upload document and store vectors
+  async uploadDocument(
+    file: File,
+    collectionName: string
+  ): Promise<{ message: string; document_id?: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("collection_name", collectionName);
+
+    // Direct fetch call for upload endpoint
+    const uploadUrl = `${API_BASE_URL}/store_document_vector`;
+
+    try {
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          // Don't set Content-Type for FormData - let browser set it with boundary
+          Authorization: `Basic ${AUTH_TOKEN}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Upload failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Upload failed for ${uploadUrl}:`, error);
+      throw error;
+    }
+  }
+
+  // Fetch email classification results
+  async getEmailClassification(
+    userId: string,
+    orgId: string,
+    offset: number = 0,
+    limit: number = 50
+  ): Promise<EmailClassificationResult> {
+    // Email classification uses a different base URL
+    const emailApiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL?.replace("/db", "") ||
+      "http://localhost:8000/v1";
+    const url = `${emailApiBaseUrl}/email-graph/run`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${AUTH_TOKEN}`,
+        },
+        body: new URLSearchParams({
+          user_id: userId,
+          org_id: orgId,
+          offset: offset.toString(),
+          limit: limit.toString(),
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Email classification request failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Email classification failed for ${url}:`, error);
+      throw error;
+    }
+  }
+
+  // Generate email reply
+  async generateEmailReply(data: {
+    email_subject: string;
+    email_body: string;
+    custom_query_input?: string;
+    collection_name?: string;
+    tone: string;
+    tool_instructions: string;
+  }): Promise<ReplyResponse> {
+    const replyApiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL?.replace("/db", "") ||
+      "http://localhost:8000/v1";
+    const url = `${replyApiBaseUrl}/reply-graph/run`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${AUTH_TOKEN}`,
+        },
+        body: new URLSearchParams({
+          email_subject: data.email_subject,
+          email_body: data.email_body,
+          custom_query_input: data.custom_query_input || "",
+          collection_name: data.collection_name || "",
+          tone: data.tone,
+          tool_instructions: data.tool_instructions,
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Reply generation failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Reply generation failed for ${url}:`, error);
+      throw error;
+    }
+  }
+
+  // Get available collections
+  async getCollections(): Promise<{
+    data: Array<{ uuid: string; name: string; cmetadata: any }>;
+    message: string;
+  }> {
+    return this.request<{
+      data: Array<{ uuid: string; name: string; cmetadata: any }>;
+      message: string;
+    }>("/db/collections");
+  }
+
+  // Generate simple email reply
+  async generateSimpleEmailReply(
+    emailText: string
+  ): Promise<{ reply: string }> {
+    const replyApiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL?.replace("/db", "") ||
+      "http://localhost:8000/v1";
+    const url = `${replyApiBaseUrl}/email-reply/generate_reply`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${AUTH_TOKEN}`,
+        },
+        body: new URLSearchParams({
+          email_text: emailText,
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Simple reply generation failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Simple reply generation failed for ${url}:`, error);
+      throw error;
+    }
+  }
+
+  // Run database query
+  async runDatabaseQuery(
+    userRequest: string
+  ): Promise<{ result: { data: any } }> {
+    const queryApiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL?.replace("/db", "") ||
+      "http://localhost:8000/v1";
+    const url = `${queryApiBaseUrl}/db-query/run_query`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${AUTH_TOKEN}`,
+        },
+        body: new URLSearchParams({
+          user_request: userRequest,
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Database query failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Database query failed for ${url}:`, error);
+      throw error;
+    }
+  }
+
+  // Generate email reply with RAG
+  async generateEmailReplyWithRAG(
+    emailText: string,
+    collectionName: string,
+    k: number = 3
+  ): Promise<{ reply: string }> {
+    const replyApiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL?.replace("/db", "") ||
+      "http://localhost:8000/v1";
+    const url = `${replyApiBaseUrl}/email-reply/generate_email_with_rag`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${AUTH_TOKEN}`,
+        },
+        body: new URLSearchParams({
+          email_text: emailText,
+          collection_name: collectionName,
+          k: k.toString(),
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `RAG email generation failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`RAG email generation failed for ${url}:`, error);
+      throw error;
+    }
   }
 }
 

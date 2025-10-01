@@ -86,6 +86,12 @@ export default function RootLayout({
                   >
                     Email Classification
                   </a>
+                  <a 
+                    href="/adv-rag" 
+                    className="text-slate-600 hover:text-slate-900 font-medium transition-colors duration-200"
+                  >
+                    ADV RAG
+                  </a>
                 </div>
 
                 {/* Authentication Buttons */}
